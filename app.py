@@ -47,16 +47,24 @@ def interpretation_generale(tirage):
     return txt
 
 def export_markdown(tirage):
-    md="---\ntitle: 'Tirage du '+str(datetime.now().date())+'"\ndate: "+str(datetime.now().date())+"\n---\n\n"
-    md+="# Résultat du tirage\n\n"
+    md = f"""---
+title: "Tirage du {datetime.now().date()}"
+date: {datetime.now().date()}
+---
+
+# Résultat du tirage
+
+"""
     for num in tirage:
-        c=cards[str(num)]
-        md+=f"## Carte {num} – {c['nom']}\n"
-        md+=f"![{c['nom']}](images/{c['image']})\n"
+        c = cards[str(num)]
+        md += f"## Carte {num} – {c['nom']}\n"
+        md += f"![{c['nom']}]({IMAGE_PATH}/{c['image']})\n"
         for t in c["texte"]:
-            md+=f"- {t}\n"
-        md+=f"**Interprétation :** {c['interpretation']}\n\n"
-    md+="\n"+interpretation_generale(tirage)
+            md += f"- {t}\n"
+        md += f"**Interprétation :** {c['interpretation']}\n\n"
+
+    md += "\n" + interpretation_generale(tirage)
+
     return md
 
 st.title("Jeu Divinatoire – Version 3 (Galerie + 7 cartes + Export + API)")
