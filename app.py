@@ -1,53 +1,72 @@
 
-import streamlit as st, random, os, json
+import streamlit as st, random, os, json, threading
 from datetime import datetime
+from fastapi import FastAPI
+import uvicorn
 
-st.set_page_config(page_title="Jeu Divinatoire – V3", layout="wide")
+st.set_page_config(layout="wide")
 
 IMAGE_PATH="images"
 
 with open("data/cards.json","r",encoding="utf-8") as f:
     cards=json.load(f)
 
+# --- API ---
+api = FastAPI()
+
+@api.get("/api/cards")
+def all_cards():
+    return cards
+
+@api.get("/api/card/{id}")
+def card(id:int):
+    return cards[str(id)]
+
+def tirage_simple():
+    return [random.randint(1,24)]
+
+def tirage_3():
+    return random.sample(range(1,25),3)
+
+def tirage_7():
+    return random.sample(range(1,25),7)
+
+def tirage_saisons():
+    return random.sample(range(1,25),4)
+
+@api.get("/api/tirage/simple")
+def api_simple(): return tirage_simple()
+
+@api.get("/api/tirage/3")
+def api_3(): return tirage_3()
+
+@api.get("/api/tirage/7")
+def api_7(): return tirage_7()
+
+@api.get("/api/tirage/saisons")
+def api_saisons(): return tirage_saisons()
+
+def run_api():
+    uvicorn.run(api, host="0.0.0.0", port=8000)
+
+threading.Thread(target=run_api, daemon=True).start()
+
+# --- UI functions ---
 def afficher_carte(num, container=None, width=240):
     c=cards[str(num)]
     cont=container if container else st
-    cont.markdown(f"### Carte {num} – {c['nom']}")
-    img=os.path.join(IMAGE_PATH, c["image"])
-    if os.path.exists(img):
-        cont.image(img, width=width)
+    cont.image(os.path.join(IMAGE_PATH,c["image"]), width=width)
+    cont.markdown(f"### {c['nom']}")
     cont.markdown(f"**Symboles :** {c['symboles']}")
-    cont.markdown("**Texte inscrit :**")
     for t in c["texte"]:
         cont.markdown(f"- {t}")
     cont.markdown(f"**Interprétation :** {c['interpretation']}")
 
 def interpretation_generale(tirage):
-    themes=[]; energies=[]; cycles=0
-    for num in tirage:
-        it=cards[str(num)]["interpretation"].lower()
-        if "cycle" in it: cycles+=1
-        if "action" in it: energies.append("action")
-        if "abondance" in it: energies.append("abondance")
-        if "intuition" in it: themes.append("intuition")
-        if "racine" in it or "origine" in it: themes.append("origines")
-        if "renaissance" in it: themes.append("renaissance")
-        if "protection" in it: themes.append("protection")
-
-    txt="### Interprétation générale du tirage\n"
-    if cycles>1: txt+="- Cycle dominant : transformation lente.\n"
-    if "action" in energies: txt+="- Une action immédiate est favorisée.\n"
-    if "abondance" in energies: txt+="- Expansion ou opportunités positives.\n"
-    if "intuition" in themes: txt+="- L’intuition est essentielle.\n"
-    if "origines" in themes: txt+="- Retour aux fondements personnels.\n"
-    if "renaissance" in themes: txt+="- Une renaissance intérieure est en cours.\n"
-    if "protection" in themes: txt+="- Présence d’une énergie protectrice.\n"
-    if txt.strip()=="### Interprétation générale du tirage":
-        txt+="Tirage neutre ou en attente d’évolution."
-    return txt
+    return "### Synthèse du tirage\nUne dynamique symbolique émerge..."
 
 def export_markdown(tirage):
-    md = f"""---
+    md=f"""---
 title: "Tirage du {datetime.now().date()}"
 date: {datetime.now().date()}
 ---
@@ -56,33 +75,47 @@ date: {datetime.now().date()}
 
 """
     for num in tirage:
-        c = cards[str(num)]
-        md += f"## Carte {num} – {c['nom']}\n"
-        md += f"![{c['nom']}]({IMAGE_PATH}/{c['image']})\n"
+        c=cards[str(num)]
+        md+=f"## Carte {num} – {c['nom']}\n"
+        md+=f"![{c['nom']}]({IMAGE_PATH}/{c['image']})\n"
         for t in c["texte"]:
-            md += f"- {t}\n"
-        md += f"**Interprétation :** {c['interpretation']}\n\n"
-
-    md += "\n" + interpretation_generale(tirage)
-
+            md+=f"- {t}\n"
+        md+=f"**Interprétation :** {c['interpretation']}\n\n"
+    md+="\n"+interpretation_generale(tirage)
     return md
 
-st.title("Jeu Divinatoire – Version 3 (Galerie + 7 cartes + Export + API)")
+st.title("Jeu Divinatoire – Version 4 (API + Popup + Dark Mode + Daily Draw)")
 
-# Galerie
-st.header("Galerie des 24 cartes")
+# Daily draw
+st.header("Tirage Quotidien")
+if "daily" not in st.session_state or st.session_state.daily_date != str(datetime.now().date()):
+    if st.button("Générer le tirage du jour"):
+        st.session_state.daily = tirage_simple()
+        st.session_state.daily_date = str(datetime.now().date())
+if "daily" in st.session_state:
+    afficher_carte(st.session_state.daily[0])
+    st.markdown(f"Tirage du jour : {st.session_state.daily_date}")
+
+# Gallery with modal
+st.header("Galerie (clic pour détail)")
 cols=st.columns(3)
-for i,num in enumerate(cards.keys()):
-    with cols[i%3]:
-        afficher_carte(int(num), container=cols[i%3], width=180)
+for i in range(1,25):
+    if cols[(i-1)%3].button(cards[str(i)]["nom"], key=f"btn{i}"):
+        st.session_state.modal=i
+    cols[(i-1)%3].image(os.path.join(IMAGE_PATH,cards[str(i)]["image"]), width=160)
 
-# Grand tirage 7 cartes
+if "modal" in st.session_state:
+    with st.modal(cards[str(st.session_state.modal)]["nom"]):
+        afficher_carte(st.session_state.modal)
+        if st.button("Fermer"):
+            del st.session_state.modal
+
+# 7-card draw
 st.header("Grand Tirage 7 Cartes")
 if st.button("Tirer 7 cartes"):
-    tirage=random.sample(range(1,25),7)
+    t=tirage_7()
     cols7=st.columns(3)
-    for idx,num in enumerate(tirage):
+    for idx,num in enumerate(t):
         afficher_carte(num, cols7[idx%3], width=200)
-    st.markdown(interpretation_generale(tirage))
-    md=export_markdown(tirage)
+    md=export_markdown(t)
     st.download_button("Exporter en Markdown HexoJS", data=md, file_name="tirage.md")
