@@ -1,7 +1,6 @@
 import streamlit as st
 import os, json, random, io
 from datetime import datetime
-from openai import OpenAI
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Image as PdfImage, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
@@ -11,17 +10,13 @@ from reportlab.lib.units import inch
 # CONFIG GLOBAL
 # -----------------------------------------------------
 
-st.set_page_config(page_title="Jeu Divinatoire – V7", layout="wide")
+st.set_page_config(page_title="Jeu Divinatoire – V7 (sans Whisper)", layout="wide")
 
 IMAGE_PATH = "images"
 DATA_PATH = "data/cards.json"
 
-# Chargement des données
 with open(DATA_PATH, "r", encoding="utf-8") as f:
     cards = json.load(f)
-
-# Whisper API
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 
 # -----------------------------------------------------
@@ -67,28 +62,27 @@ def interpretation_generale(tirage):
     out = "### Interprétation générale\n"
 
     if cycles > 1:
-        out += "- Une dynamique cyclique importante influence la situation.\n"
+        out += "- Une dynamique cyclique influence fortement la situation.\n"
     if "action" in energies:
-        out += "- Une action concrète ou décision est favorisée maintenant.\n"
+        out += "- Une action ou décision immédiate est favorisée.\n"
     if "abondance" in energies:
-        out += "- Une période d’expansion positive est présente.\n"
+        out += "- Une période d’expansion et d’opportunités est signalée.\n"
     if "intuition" in themes:
-        out += "- L’intuition joue un rôle clé dans ce tirage.\n"
+        out += "- L’intuition joue un rôle important.\n"
     if "origines" in themes:
-        out += "- Un retour aux sources ou à vos fondations est indiqué.\n"
+        out += "- Un retour aux fondements personnels apparaît.\n"
     if "renaissance" in themes:
-        out += "- Une renaissance intérieure ou un nouveau départ est en cours.\n"
+        out += "- Une renaissance ou un nouveau départ est en cours.\n"
     if "protection" in themes:
-        out += "- Une énergie protectrice enveloppe ce tirage.\n"
+        out += "- Une énergie protectrice entoure ce tirage.\n"
 
     if out.strip() == "### Interprétation générale":
-        out += "Ce tirage semble neutre ou en transition."
+        out += "Le tirage est neutre ou en transition."
 
     return out
 
 
 def export_pdf_single_page(tirage):
-    """Génération PDF en page unique style Tarot Illustré"""
     buffer = io.BytesIO()
     styles = getSampleStyleSheet()
     story = []
@@ -98,10 +92,8 @@ def export_pdf_single_page(tirage):
 
     for num in tirage:
         c = cards[str(num)]
-
         story.append(Paragraph(f"<b>{c['nom']}</b>", styles["Heading2"]))
         story.append(PdfImage(os.path.join(IMAGE_PATH, c["image"]), width=2.2 * inch, height=3.2 * inch))
-
         story.append(Paragraph("<br/>".join(c["texte"]), styles["BodyText"]))
         story.append(Paragraph(f"<i>{c['interpretation']}</i>", styles["Italic"]))
         story.append(Spacer(1, 0.4 * inch))
@@ -115,12 +107,11 @@ def export_pdf_single_page(tirage):
 
 
 # -----------------------------------------------------
-# API INTERNE (A2)
+# API interne A2
 # -----------------------------------------------------
 
 def route(path):
     st.session_state["internal_api_route"] = path
-
 
 def internal_api_handler():
     if "internal_api_route" not in st.session_state:
@@ -128,7 +119,6 @@ def internal_api_handler():
 
     path = st.session_state["internal_api_route"]
 
-    # Routing simple
     if path == "/internal_api/cards":
         return cards
 
@@ -153,35 +143,14 @@ def internal_api_handler():
 
 
 # -----------------------------------------------------
-# UI : TITRE
+# UI
 # -----------------------------------------------------
 
-st.title("Jeu Divinatoire – Version 7 Complète")
+st.title("Jeu Divinatoire – Version 7 (sans Whisper)")
 
 
-# -----------------------------------------------------
-# TIRAGE VOCAL (WHISPER)
-# -----------------------------------------------------
-
-st.header("Tirage vocal (Whisper)")
-
-audio = st.file_uploader("Envoyez un fichier audio (wav, mp3, m4a)", type=["wav", "mp3", "m4a"])
-if audio:
-    st.write("Transcription en cours…")
-    resp = client.audio.transcriptions.create(
-        file=audio,
-        model="whisper-1",
-        language="fr"
-    )
-    st.success("Vous avez dit : " + resp.text)
-
-
-# -----------------------------------------------------
-# TIRAGE DU JOUR
-# -----------------------------------------------------
-
+# Tirage quotidien
 st.header("Tirage du jour")
-
 if "daily" not in st.session_state or st.session_state.get("daily_date") != str(datetime.now().date()):
     if st.button("Générer le tirage du jour"):
         st.session_state.daily = random.sample(range(1, 25), 1)
@@ -191,102 +160,12 @@ if "daily" in st.session_state:
     afficher_carte(st.session_state.daily[0])
     st.caption(f"Tirage généré le {st.session_state.daily_date}")
 
-# -----------------------------------------------------
-# THEME MYSTIQUE AVANCÉ — ANIMATIONS + HALO
-# -----------------------------------------------------
-
-st.markdown("""
-<style>
-
-body {
-    background: radial-gradient(circle at 50% 20%, #1d1a33, #0d0b16 70%);
-    animation: bgfade 12s ease-in-out infinite alternate;
-}
-
-@keyframes bgfade {
-  0% { background: radial-gradient(circle at 50% 20%, #1d1a33, #0d0b16 70%); }
-  100% { background: radial-gradient(circle at 50% 20%, #221d44, #0b0810 70%); }
-}
-
-/* --- TITRE AVEC AURA --- */
-h1, h2, h3 {
-    text-shadow: 0 0 15px #8d5cf6, 0 0 30px #5f34c7;
-}
-
-h1 {
-    animation: glowpulse 4s infinite ease-in-out;
-}
-
-@keyframes glowpulse {
-  0% { text-shadow: 0px 0px 10px #a879ff; }
-  50% { text-shadow: 0px 0px 25px #d3a3ff; }
-  100% { text-shadow: 0px 0px 10px #a879ff; }
-}
-
-
-/* --- CARDS: halo & animations --- */
-img {
-    border-radius: 15px;
-    box-shadow: 0 0 12px rgba(202, 151, 255, 0.4);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-img:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 30px rgba(225, 189, 255, 0.8);
-}
-
-/* --- MYSTIC PARTICLES --- */
-.mystic-particles {
-    position: fixed;
-    pointer-events: none;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    overflow: hidden;
-    z-index: 0;
-}
-
-.particle {
-    position: absolute;
-    width: 4px;
-    height: 4px;
-    background: radial-gradient(circle, #d9b8ff 0%, #8d5cf6 70%);
-    border-radius: 50%;
-    animation: floatUp 10s linear infinite;
-    opacity: 0.7;
-}
-
-@keyframes floatUp {
-    0% { transform: translateY(100vh) scale(0.3); opacity:0; }
-    20% { opacity:0.8; }
-    100% { transform: translateY(-10vh) scale(1); opacity:0; }
-}
-
-/* --- MODAL POPUP --- */
-[data-baseweb="modal"] {
-    background: rgba(10, 10, 20, 0.85) !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid #8d5cf6 !important;
-    box-shadow: 0px 0px 20px #8d5cf6;
-}
-
-</style>
-
-<div class="mystic-particles">
-    """ + 
-    "\n".join([
-        f'<div class="particle" style="left:{i*4}%; animation-delay:{i*0.5}s;"></div>'
-        for i in range(1, 25)
-    ])
-+ """
-</div>
-""", unsafe_allow_html=True)
 
 # -----------------------------------------------------
-# GALLERIE + POPUP
+# Galerie + Popups
 # -----------------------------------------------------
 
-st.header("Galerie (cliquer pour plus de détails)")
+st.header("Galerie (cliquer pour détails)")
 
 cols = st.columns(3)
 for i in range(1, 25):
@@ -297,25 +176,24 @@ for i in range(1, 25):
 
 if "modal" in st.session_state:
     with st.modal(cards[str(st.session_state.modal)]["nom"]):
-        afficher_carte(st.session_state.modal, width=300)
+        afficher_carte(st.session_state.modal, width=280)
         if st.button("Fermer"):
             del st.session_state.modal
 
 
 # -----------------------------------------------------
-# TIRAGES COMPLETS
+# Tirages complets
 # -----------------------------------------------------
 
 st.header("Tirages")
 
-# Tirage simple
+# Simple
 if st.button("Tirage simple"):
     t = random.sample(range(1, 25), 1)
     afficher_carte(t[0])
     st.markdown(interpretation_generale(t))
 
-
-# Tirage 3 cartes
+# 3 cartes
 if st.button("Tirage 3 cartes"):
     t = random.sample(range(1, 25), 3)
     cols3 = st.columns(3)
@@ -323,17 +201,15 @@ if st.button("Tirage 3 cartes"):
         afficher_carte(num, cols3[idx])
     st.markdown(interpretation_generale(t))
 
-
-# Tirage saisons
+# Saisons
 if st.button("Tirage des saisons"):
-    saisons = ["Printemps", "Été", "Automne", "Hiver"]
     t = random.sample(range(1, 25), 4)
+    saisons = ["Printemps", "Été", "Automne", "Hiver"]
     cols4 = st.columns(4)
     for idx, num in enumerate(t):
         cols4[idx].markdown(f"### {saisons[idx]}")
         afficher_carte(num, cols4[idx])
     st.markdown(interpretation_generale(t))
-
 
 # Grand tirage 7 cartes
 if st.button("Grand tirage 7 cartes"):
@@ -345,4 +221,4 @@ if st.button("Grand tirage 7 cartes"):
     st.markdown(interpretation_generale(t))
 
     pdf = export_pdf_single_page(t)
-    st.download_button("Exporter en PDF Tarot Illustré", data=pdf, file_name="tirage.pdf")
+    st.download_button("Télécharger PDF Tarot Illustré", data=pdf, file_name="tirage.pdf")
